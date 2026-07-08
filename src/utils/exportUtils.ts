@@ -60,8 +60,18 @@ export const exportToExcel = (delegacoes: Delegacao[]) => {
   XLSX.writeFile(workbook, "Caminhada_do_ECA_Delegoes_Escolares.xlsx");
 };
 
+// Helper to load logo image
+const loadLogo = (): Promise<HTMLImageElement | null> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = '/logo.png';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+  });
+};
+
 // 2. Export entire table to PDF (Relatório de Delegações)
-export const exportToPDF = (delegacoes: Delegacao[]) => {
+export const exportToPDF = async (delegacoes: Delegacao[]) => {
   if (delegacoes.length === 0) return;
 
   const doc = new jsPDF({
@@ -71,33 +81,40 @@ export const exportToPDF = (delegacoes: Delegacao[]) => {
   });
 
   const totalAlunos = delegacoes.reduce((acc, curr) => acc + curr.quantidade, 0);
+  const logo = await loadLogo();
 
   // Styling helpers
   doc.setFillColor(26, 54, 93); // Dark Navy Blue (#1A365D)
   doc.rect(0, 0, 297, 40, 'F'); // Header bar
 
+  // Draw Logo in Header
+  if (logo) {
+    doc.addImage(logo, 'PNG', 15, 8, 24, 24);
+  }
+  const textX = logo ? 44 : 15;
+
   // Header Text
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text("CONSELHO TUTELAR DE SALVADOR", 15, 15);
+  doc.setFontSize(18);
+  doc.text("CONSELHO TUTELAR DE SALVADOR", textX, 17);
   
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.text("Organização da Caminhada do ECA - 13 de Julho - Concentração: 08:00h", 15, 23);
-  doc.text("Comemoração do Estatuto da Criança e do Adolescente (Lei 8.069)", 15, 29);
+  doc.setFontSize(10.5);
+  doc.text("Organização da Caminhada do ECA - 13 de Julho - Concentração: 08:00h no Campo Grande", textX, 24);
+  doc.text("Comemoração do Estatuto da Criança e do Adolescente (Lei Federal nº 8.069)", textX, 30);
 
   // Right-aligned header info
-  doc.setFontSize(10);
-  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 245, 15);
-  doc.text(`Total de Escolas: ${delegacoes.length}`, 245, 22);
-  doc.text(`Total de Participantes: ${totalAlunos}`, 245, 29);
+  doc.setFontSize(9.5);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 245, 14);
+  doc.text(`Total de Escolas: ${delegacoes.length}`, 245, 21);
+  doc.text(`Total de Participantes: ${totalAlunos}`, 245, 28);
 
   // Title of report
   doc.setTextColor(26, 54, 93);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text("RELATÓRIO GERAL DE DELEGAÇÕES ESCOLARES INSCRITAS", 15, 50);
+  doc.setFontSize(14);
+  doc.text("RELATÓRIO GERAL DE DELEGAÇÕES ESCOLARES INSCRITAS", 15, 48);
 
   // Table columns
   const tableColumn = [
@@ -125,7 +142,7 @@ export const exportToPDF = (delegacoes: Delegacao[]) => {
   autoTable(doc, {
     head: [tableColumn],
     body: tableRows,
-    startY: 55,
+    startY: 53,
     theme: 'striped',
     headStyles: {
       fillColor: [26, 54, 93],
@@ -166,12 +183,15 @@ export const exportToPDF = (delegacoes: Delegacao[]) => {
 };
 
 // 3. Export individual confirmation receipt PDF (Recibo de Inscrição)
-export const exportReciboPDF = (delegacao: Delegacao) => {
+export const exportReciboPDF = async (delegacao: Delegacao) => {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
   });
+
+  // Load logo
+  const logo = await loadLogo();
 
   // Color Palette
   const primaryColor = [26, 54, 93]; // Deep Navy
@@ -187,26 +207,22 @@ export const exportReciboPDF = (delegacao: Delegacao) => {
   doc.setFillColor(26, 54, 93);
   doc.rect(10, 10, 190, 32, 'F');
 
-  // Badge/Seal visual on the right of the header
-  doc.setFillColor(217, 119, 6);
-  doc.circle(180, 26, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text("ECA", 176, 28);
-  doc.setFontSize(6);
-  doc.text("BAHIA", 176, 31);
+  // Draw Logo inside Header Banner
+  if (logo) {
+    doc.addImage(logo, 'PNG', 15, 12, 20, 20);
+  }
+  const textX = logo ? 38 : 16;
 
   // Header Text
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text("CONSELHO TUTELAR DE SALVADOR", 16, 20);
+  doc.setFontSize(14);
+  doc.text("CONSELHO TUTELAR DE SALVADOR", textX, 20);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text("Caminhada do ECA | 13 de Julho - Salvador/BA", 16, 27);
-  doc.setFontSize(8);
-  doc.text("Salvaguarda dos Direitos da Criança e do Adolescente - Lei Federal nº 8.069/90", 16, 33);
+  doc.setFontSize(9.5);
+  doc.text("Caminhada do ECA | 13 de Julho - Salvador/BA", textX, 26);
+  doc.setFontSize(7.5);
+  doc.text("Garantindo a Prioridade Absoluta e Proteção Integral a Crianças e Adolescentes", textX, 31);
 
   // Receipt Title
   doc.setTextColor(26, 54, 93);
@@ -277,28 +293,28 @@ export const exportReciboPDF = (delegacao: Delegacao) => {
   doc.rect(15, 149, 180, 42, 'F');
   doc.rect(15, 149, 180, 42);
 
-  // Box 2 content
+  // Box 2 content (increased X offset for values to 62 to prevent overlaps)
   doc.setTextColor(51, 65, 85);
   
   doc.setFont('helvetica', 'bold');
   doc.text("Local de Embarque:", 20, 156);
   doc.setFont('helvetica', 'normal');
-  doc.text(delegacao.embarque, 55, 156);
+  doc.text(delegacao.embarque, 62, 156);
 
   doc.setFont('helvetica', 'bold');
   doc.text("Destino Final:", 20, 164);
   doc.setFont('helvetica', 'normal');
-  doc.text(delegacao.destino, 55, 164);
+  doc.text(delegacao.destino, 62, 164);
 
   doc.setFont('helvetica', 'bold');
   doc.text("Horário de Saída:", 20, 172);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${delegacao.horarioSaida} h`, 55, 172);
+  doc.text(`${delegacao.horarioSaida} h`, 62, 172);
 
   doc.setFont('helvetica', 'bold');
   doc.text("Horário de Retorno:", 20, 180);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${delegacao.horarioRetorno} h`, 55, 180);
+  doc.text(`${delegacao.horarioRetorno} h`, 62, 180);
 
 
   // Section 3: Delegação e Contagem
@@ -312,7 +328,7 @@ export const exportReciboPDF = (delegacao: Delegacao) => {
   doc.rect(15, 206, 180, 25, 'F');
   doc.rect(15, 206, 180, 25);
 
-  // Box 3 content
+  // Box 3 content (increased X offset for quantity value to 92 to prevent overlaps)
   doc.setTextColor(51, 65, 85);
   
   doc.setFont('helvetica', 'bold');
@@ -320,7 +336,7 @@ export const exportReciboPDF = (delegacao: Delegacao) => {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(217, 119, 6);
   doc.setFontSize(11);
-  doc.text(`${delegacao.quantidade} integrantes (Alunos, Professores, Coordenadores)`, 83, 213);
+  doc.text(`${delegacao.quantidade} integrantes (Alunos, Professores, Coordenadores)`, 92, 213);
 
   doc.setTextColor(51, 65, 85);
   doc.setFont('helvetica', 'bold');

@@ -23,7 +23,11 @@ import {
   Layers,
   HeartHandshake,
   Download,
-  Database
+  Database,
+  LogOut,
+  Lock,
+  Link,
+  Copy
 } from 'lucide-react';
 import { Delegacao } from './types';
 import { DELEGACOES_INICIAIS } from './mockData';
@@ -36,6 +40,16 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dbMissing, setDbMissing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Routing & Authentication States
+  const isPublicView = window.location.search.includes('view=public') || window.location.search.includes('formOnly=true');
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+    return sessionStorage.getItem('caminhada_eca_admin_logged') === 'true';
+  });
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [publicSuccessData, setPublicSuccessData] = useState<Delegacao | null>(null);
   
   // Form State
   const [nomeEscola, setNomeEscola] = useState('');
@@ -53,6 +67,39 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
+
+  // Handle Login Action
+  const handleLogin = (e: FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || 'admin';
+    if (usernameInput.trim() === 'admin' && passwordInput === adminPass) {
+      sessionStorage.setItem('caminhada_eca_admin_logged', 'true');
+      setIsAdminLoggedIn(true);
+      triggerSuccess('Login efetuado com sucesso!');
+    } else {
+      setLoginError('Usuário ou senha inválidos.');
+    }
+  };
+
+  // Handle Logout Action
+  const handleLogout = () => {
+    sessionStorage.removeItem('caminhada_eca_admin_logged');
+    setIsAdminLoggedIn(false);
+    setUsernameInput('');
+    setPasswordInput('');
+    triggerSuccess('Sessão encerrada com sucesso.');
+  };
+
+  // Copy Link for Public Registration
+  const copyPublicLink = () => {
+    const link = `${window.location.origin}${window.location.pathname}?view=public`;
+    navigator.clipboard.writeText(link).then(() => {
+      triggerSuccess('Link do formulário de inscrição pública copiado para a área de transferência!');
+    }).catch(() => {
+      setError('Não foi possível copiar o link automaticamente.');
+    });
+  };
 
   // Load from Supabase or fallback to localStorage on initial render
   const fetchDelegacoes = async () => {
@@ -283,8 +330,13 @@ export default function App() {
       if (dbMissing) {
         const updated = [novaDelegacao, ...delegacoes];
         saveToStorage(updated);
-        triggerSuccess('Escola inscrita com sucesso! (Local)');
-        resetForm();
+        if (isPublicView) {
+          resetForm();
+          setPublicSuccessData(novaDelegacao);
+        } else {
+          triggerSuccess('Escola inscrita com sucesso! (Local)');
+          resetForm();
+        }
       } else {
         const { error: dbErr } = await supabase
           .from('delegacoes')
@@ -293,9 +345,14 @@ export default function App() {
         if (dbErr) {
           setError(`Erro ao salvar no Supabase: ${dbErr.message}`);
         } else {
-          triggerSuccess('Escola inscrita com sucesso no Supabase!');
-          resetForm();
-          fetchDelegacoes();
+          if (isPublicView) {
+            resetForm();
+            setPublicSuccessData(novaDelegacao);
+          } else {
+            triggerSuccess('Escola inscrita com sucesso no Supabase!');
+            resetForm();
+            fetchDelegacoes();
+          }
         }
       }
     }
@@ -366,46 +423,473 @@ export default function App() {
   const totalAlunos = delegacoes.reduce((acc, curr) => acc + curr.quantidade, 0);
   const mediaAlunos = totalEscolas > 0 ? Math.round(totalAlunos / totalEscolas) : 0;
 
+  // --- RENDER FOR PUBLIC VIEW ---
+  if (isPublicView) {
+    return (
+      <div className="min-h-screen bg-slate-100 font-sans text-slate-800 flex flex-col justify-between" id="public-container">
+        
+        {/* HEADER PUBLICO SIMPLIFICADO */}
+        <header className="bg-blue-900 text-white p-5 border-b-4 border-yellow-500 shadow-sm shrink-0">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img src="/logo.png" alt="Logo Conselho Tutelar" className="w-14 h-14 object-contain bg-white p-1 rounded-full border border-yellow-500" />
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight uppercase">Caminhada do ECA</h1>
+                <p className="text-[10px] sm:text-xs font-semibold opacity-80 uppercase tracking-widest">
+                  Conselho Tutelar de Salvador • Ficha de Inscrição
+                </p>
+              </div>
+            </div>
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-bold text-yellow-500">13 de Julho • 08:00h</p>
+              <p className="text-[9px] uppercase opacity-70">Concentração no Campo Grande</p>
+            </div>
+          </div>
+        </header>
+
+        {/* CONTEÚDO PRINCIPAL PÚBLICO */}
+        <main className="max-w-4xl mx-auto w-full px-4 py-8 flex-1 flex flex-col justify-center items-center">
+          {publicSuccessData ? (
+            /* TELA DE SUCESSO PÚBLICA */
+            <div className="bg-white border border-slate-300 p-8 shadow-md max-w-lg w-full text-center space-y-6 animate-fade-in">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto border-2 border-emerald-500">
+                <CheckCircle2 className="w-10 h-10" />
+              </div>
+              
+              <div className="space-y-2">
+                <h2 className="text-xl font-black text-slate-800 uppercase tracking-wide">Inscrição Homologada!</h2>
+                <p className="text-xs text-slate-500">
+                  A escola <strong>{publicSuccessData.nomeEscola}</strong> foi inscrita com sucesso para a Caminhada do ECA 2026.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 p-4 border border-slate-200 text-left text-xs space-y-2 font-medium text-slate-600">
+                <p><strong>Responsável:</strong> {publicSuccessData.responsavel}</p>
+                <p><strong>Embarque:</strong> {publicSuccessData.embarque}</p>
+                <p><strong>Participantes:</strong> {publicSuccessData.quantidade} integrantes</p>
+                <p><strong>Destino:</strong> {publicSuccessData.destino}</p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={async () => {
+                    try {
+                      await exportReciboPDF(publicSuccessData);
+                    } catch (e: any) {
+                      setError(`Erro ao gerar PDF: ${e.message || e}`);
+                    }
+                  }}
+                  className="w-full bg-emerald-600 text-white font-bold py-3 text-xs uppercase tracking-widest hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm border-0"
+                >
+                  <Download className="w-4 h-4" />
+                  Baixar Comprovante Oficial (PDF)
+                </button>
+                
+                <button
+                  onClick={() => setPublicSuccessData(null)}
+                  className="w-full border border-slate-300 hover:bg-slate-50 text-slate-600 py-3 text-xs uppercase tracking-widest font-bold transition-all cursor-pointer bg-white"
+                >
+                  Realizar outra inscrição
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* FORMULÁRIO PÚBLICO */
+            <div className="w-full max-w-xl">
+              <div className="bg-white border border-slate-300 shadow-sm p-6 flex flex-col gap-5 rounded-none">
+                
+                {/* Header do Form */}
+                <div className="border-l-4 border-blue-900 pl-4 mb-2">
+                  <h2 className="text-base font-bold text-slate-800 uppercase tracking-tight">
+                    Formulário de Inscrição Escolar
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Preencha todos os campos obrigatórios para garantir a logística e segurança do seu grupo.
+                  </p>
+                </div>
+
+                {/* Corpo do Form */}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  
+                  {error && (
+                     <div className="bg-red-50 border border-red-200 text-red-900 p-3.5 rounded-none flex items-center gap-2.5 text-xs font-medium">
+                       <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                       <span>{error}</span>
+                     </div>
+                  )}
+
+                  {/* Nome da Escola */}
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                      Nome da Escola <span className="text-yellow-600">*</span>
+                    </label>
+                    <input
+                      id="input-nome-escola"
+                      type="text"
+                      value={nomeEscola}
+                      onChange={(e) => setNomeEscola(e.target.value)}
+                      placeholder="Escola Municipal Exemplo"
+                      className="w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {/* Endereço */}
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                      Endereço Completo <span className="text-yellow-600">*</span>
+                    </label>
+                    <input
+                      id="input-endereco"
+                      type="text"
+                      value={endereco}
+                      onChange={(e) => setEndereco(e.target.value)}
+                      placeholder="Rua das Flores, s/n, Centro"
+                      className="w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {/* Embarque e Destino */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                        Ponto de Embarque <span className="text-yellow-600">*</span>
+                      </label>
+                      <input
+                        id="input-embarque"
+                        type="text"
+                        value={embarque}
+                        onChange={(e) => setEmbarque(e.target.value)}
+                        placeholder="Ex: Portão Principal"
+                        className="w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all placeholder:text-slate-400"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                        Destino Final <span className="text-yellow-600">*</span>
+                      </label>
+                      <input
+                        id="input-destino"
+                        type="text"
+                        value={destino}
+                        onChange={(e) => setDestino(e.target.value)}
+                        placeholder="Campo Grande"
+                        className="w-full border border-slate-200 bg-slate-100 text-slate-600 px-3 py-2 text-sm cursor-not-allowed rounded-none placeholder:text-slate-400"
+                        readOnly
+                      />
+                    </div>
+                  </div>
+
+                  {/* Horários Saída / Retorno */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                        Horário Saída <span className="text-yellow-600">*</span>
+                      </label>
+                      <input
+                        id="input-horario-saida"
+                        type="time"
+                        value={horarioSaida}
+                        onChange={(e) => setHorarioSaida(e.target.value)}
+                        className="w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                        Horário Retorno <span className="text-yellow-600">*</span>
+                      </label>
+                      <input
+                        id="input-horario-retorno"
+                        type="time"
+                        value={horarioRetorno}
+                        onChange={(e) => setHorarioRetorno(e.target.value)}
+                        className="w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Responsável e Contato */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                        Responsável pelo Grupo <span className="text-yellow-600">*</span>
+                      </label>
+                      <input
+                        id="input-responsavel"
+                        type="text"
+                        value={responsavel}
+                        onChange={(e) => setResponsavel(e.target.value)}
+                        placeholder="Prof. João Silva"
+                        className="w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all placeholder:text-slate-400"
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                        Contato (WhatsApp) <span className="text-yellow-600">*</span>
+                      </label>
+                      <input
+                        id="input-contato"
+                        type="text"
+                        value={contato}
+                        onChange={(e) => handleContatoChange(e.target.value)}
+                        placeholder="(71) 99999-0000"
+                        className="w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quantidade */}
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                      Quantidade de Participantes <span className="text-yellow-600">*</span>
+                    </label>
+                    <input
+                      id="input-quantidade"
+                      type="number"
+                      min="1"
+                      value={quantidade}
+                      onChange={(e) => setQuantidade(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="45"
+                      className="w-full sm:w-32 border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all placeholder:text-slate-400"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">Total somado de estudantes, educadores e tutores.</p>
+                  </div>
+
+                  {/* Botões de Ação */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      id="btn-limpar-form"
+                      type="button"
+                      onClick={resetForm}
+                      className="flex-1 border border-slate-300 hover:bg-slate-50 text-slate-600 py-3 text-xs uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer flex items-center justify-center gap-1.5 bg-white"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Limpar
+                    </button>
+                    <button
+                      id="btn-confirmar-form"
+                      type="submit"
+                      className="flex-1 bg-blue-900 text-white font-bold py-3 text-xs uppercase tracking-widest hover:bg-blue-800 transition-colors rounded-none cursor-pointer flex items-center justify-center gap-1.5 border-0"
+                    >
+                      Salvar Formulário
+                    </button>
+                  </div>
+
+                  {/* Opção Rápida de Mock/Teste */}
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="uppercase font-semibold tracking-wider text-[9px] text-slate-400">Ambiente de Testes</span>
+                    <button
+                      id="btn-teste-rapido"
+                      type="button"
+                      onClick={loadExemploValores}
+                      className="text-blue-900 hover:text-blue-800 font-bold uppercase tracking-wide text-[10px] underline cursor-pointer bg-transparent border-0"
+                    >
+                      Gerar dados de teste
+                    </button>
+                  </div>
+
+                </form>
+
+              </div>
+
+              {/* BOX COMPLEMENTAR DE INFOS */}
+              <div className="mt-6 bg-blue-50 border-2 border-dashed border-blue-200 p-6 rounded-none text-blue-900 space-y-4 text-left">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-950 underline underline-offset-4">
+                  Observações Importantes
+                </h4>
+                <ul className="text-[11px] space-y-3 text-blue-800">
+                  <li className="flex gap-2">
+                    <span className="font-bold">•</span>
+                    <span>A caminhada celebra os direitos da criança e do adolescente garantidos pelo ECA.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-bold">•</span>
+                    <span>É obrigatória a presença de pelo menos 1 responsável para cada 15 alunos.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-bold">•</span>
+                    <span>Ponto de concentração oficial: Campo Grande, às 08:00h pontualmente.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-bold">•</span>
+                    <span>Importante providenciar identificação visual e hidratação para as crianças.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </main>
+
+        {/* FOOTER PÚBLICO */}
+        <footer className="bg-white border-t border-slate-200 py-6 text-center shrink-0">
+          <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em]">
+            © 2026 Conselho Tutelar de Salvador - Organização da Caminhada do ECA
+          </p>
+        </footer>
+
+      </div>
+    );
+  }
+
+  // --- RENDER FOR ADMIN LOGIN ---
+  if (!isAdminLoggedIn) {
+    return (
+      <div className="min-h-screen bg-slate-100 font-sans text-slate-800 flex items-center justify-center p-4" id="login-container">
+        <div className="bg-white border border-slate-300 p-8 shadow-md max-w-md w-full flex flex-col gap-6 rounded-none">
+          
+          {/* LOGO E TÍTULO LOGIN */}
+          <div className="text-center space-y-3">
+            <img src="/logo.png" alt="Logo Conselho Tutelar" className="w-24 h-24 object-contain mx-auto bg-slate-50 p-2 rounded-full border-2 border-blue-900" />
+            <div className="space-y-1">
+              <h2 className="text-lg font-black text-blue-900 uppercase tracking-tight">Conselho Tutelar de Salvador</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Painel Administrativo • Caminhada do ECA</p>
+            </div>
+          </div>
+
+          {/* FORMULÁRIO DE LOGIN */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            {loginError && (
+              <div className="bg-red-50 border border-red-200 text-red-900 p-3 rounded-none flex items-center gap-2 text-xs font-medium">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">Usuário</label>
+              <div className="relative">
+                <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder="Digite o usuário"
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-none transition-all placeholder:text-slate-400"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">Senha</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="password"
+                  required
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Digite a senha"
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-none transition-all placeholder:text-slate-400"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-blue-900 text-white font-bold py-3 text-xs uppercase tracking-widest hover:bg-blue-800 transition-colors rounded-none cursor-pointer flex items-center justify-center gap-2 shadow-sm border-0"
+            >
+              Entrar no Painel
+            </button>
+          </form>
+
+          {/* INFO AUXILIAR */}
+          <div className="text-center pt-2 border-t border-slate-100">
+            <a
+              href="?view=public"
+              className="text-[10px] text-blue-900 hover:text-blue-800 font-bold uppercase tracking-wide underline cursor-pointer"
+            >
+              Ir para o Formulário Público de Inscrição
+            </a>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER FOR ADMIN DASHBOARD ---
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col" id="main-container">
       
       {/* HEADER PRINCIPAL */}
       <header className="bg-blue-900 text-white p-6 border-b-4 border-yellow-500 flex-none shrink-0" id="header-section">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tighter uppercase flex items-center gap-2">
-              <School className="w-6 h-6 text-yellow-500" />
-              Caminhada do ECA
-            </h1>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1">
-              <p className="text-xs sm:text-sm font-medium opacity-80 uppercase tracking-widest">
-                Conselho Tutelar de Salvador • Organização 2026
-              </p>
-              <span className="hidden sm:inline opacity-30 text-white">•</span>
-              {isLoading ? (
-                <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-bold bg-yellow-500/20 px-2 py-0.5 uppercase tracking-wider rounded border border-yellow-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-ping"></span>
-                  Conectando Supabase...
-                </span>
-              ) : dbMissing ? (
-                <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 uppercase tracking-wider rounded border border-amber-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                  Modo Local (Banco Ausente)
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-2 py-0.5 uppercase tracking-wider rounded border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Supabase Sincronizado
-                </span>
-              )}
+          <div className="flex items-center gap-4">
+            <img src="/logo.png" alt="Logo Conselho Tutelar" className="w-16 h-16 object-contain bg-white p-1 rounded-full border-2 border-yellow-500" />
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tighter uppercase flex items-center gap-2">
+                Caminhada do ECA
+              </h1>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1">
+                <p className="text-xs sm:text-sm font-medium opacity-80 uppercase tracking-widest">
+                  Conselho Tutelar de Salvador • Organização 2026
+                </p>
+                <span className="hidden sm:inline opacity-30 text-white">•</span>
+                {isLoading ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-yellow-400 font-bold bg-yellow-500/20 px-2 py-0.5 uppercase tracking-wider rounded border border-yellow-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-ping"></span>
+                    Conectando Supabase...
+                  </span>
+                ) : dbMissing ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 uppercase tracking-wider rounded border border-amber-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    Modo Local (Banco Ausente)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-2 py-0.5 uppercase tracking-wider rounded border border-emerald-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Supabase Sincronizado
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <div className="text-left sm:text-right">
-            <p className="text-lg sm:text-xl font-bold text-yellow-500">13 de Julho</p>
-            <p className="text-xs uppercase opacity-70">Concentração às 08:00h no Campo Grande</p>
+          
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto shrink-0">
+            <div className="text-left sm:text-right hidden md:block">
+              <p className="text-lg sm:text-xl font-bold text-yellow-500">13 de Julho</p>
+              <p className="text-xs uppercase opacity-70">Concentração às 08:00h no Campo Grande</p>
+            </div>
+            
+            {/* BOTÕES DE CONTROLE ADMIN */}
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={copyPublicLink}
+                title="Copiar Link do Formulário Público para Divulgação"
+                className="flex-1 sm:flex-initial bg-yellow-600 hover:bg-yellow-500 text-white font-bold px-3 py-2 text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 rounded-none cursor-pointer border-0"
+              >
+                <Link className="w-3.5 h-3.5" />
+                <span>Link Público</span>
+              </button>
+              
+              <button
+                onClick={handleLogout}
+                title="Encerrar Sessão do Administrador"
+                className="flex-1 sm:flex-initial border border-white/30 hover:border-white hover:bg-white/10 text-white font-bold px-3 py-2 text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 rounded-none cursor-pointer bg-transparent"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sair</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
+
+      {/* PAINEL DE FEEDBACK RAPIDO */}
+      {successMessage && (
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-6">
+          <div className="bg-emerald-50 border-l-4 border-emerald-600 text-emerald-900 p-4 rounded-none flex items-start gap-3 shadow-sm animate-fade-in" id="success-banner">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-xs uppercase tracking-wider text-emerald-800">Operação Realizada</p>
+              <p className="text-xs text-emerald-700 mt-1">{successMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AVISO DE SCHEMA SUPABASE AUSENTE */}
       {dbMissing && (
@@ -428,19 +912,6 @@ export default function App() {
               <span className="inline-flex items-center px-2.5 py-1 bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider rounded">
                 Fallback Local Ativado
               </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PAINEL DE FEEDBACK RAPIDO */}
-      {successMessage && (
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-6">
-          <div className="bg-emerald-50 border-l-4 border-emerald-600 text-emerald-900 p-4 rounded-none flex items-start gap-3 shadow-sm animate-fade-in" id="success-banner">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-xs uppercase tracking-wider text-emerald-800">Operação Realizada</p>
-              <p className="text-xs text-emerald-700 mt-1">{successMessage}</p>
             </div>
           </div>
         </div>
@@ -661,7 +1132,7 @@ export default function App() {
                     id="btn-limpar-form"
                     type="button"
                     onClick={resetForm}
-                    className="flex-1 border border-slate-300 hover:bg-slate-50 text-slate-600 py-3 text-xs uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer flex items-center justify-center gap-1.5"
+                    className="flex-1 border border-slate-300 hover:bg-slate-50 text-slate-600 py-3 text-xs uppercase tracking-widest font-bold transition-all rounded-none cursor-pointer flex items-center justify-center gap-1.5 bg-white"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     Limpar
@@ -669,7 +1140,7 @@ export default function App() {
                   <button
                     id="btn-confirmar-form"
                     type="submit"
-                    className="flex-1 bg-blue-900 text-white font-bold py-3 text-xs uppercase tracking-widest hover:bg-blue-800 transition-colors rounded-none cursor-pointer flex items-center justify-center gap-1.5"
+                    className="flex-1 bg-blue-900 text-white font-bold py-3 text-xs uppercase tracking-widest hover:bg-blue-800 transition-colors rounded-none cursor-pointer flex items-center justify-center gap-1.5 border-0"
                   >
                     {editingId ? 'Salvar Edição' : 'Salvar Formulário'}
                   </button>
@@ -682,7 +1153,7 @@ export default function App() {
                     id="btn-teste-rapido"
                     type="button"
                     onClick={loadExemploValores}
-                    className="text-blue-900 hover:text-blue-800 font-bold uppercase tracking-wide text-[10px] underline cursor-pointer"
+                    className="text-blue-900 hover:text-blue-800 font-bold uppercase tracking-wide text-[10px] underline cursor-pointer bg-transparent border-0"
                   >
                     Gerar dados de teste
                   </button>
@@ -730,7 +1201,13 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                 <button
                   id="btn-export-pdf"
-                  onClick={() => exportToPDF(delegacoes)}
+                  onClick={async () => {
+                    try {
+                      await exportToPDF(delegacoes);
+                    } catch (e: any) {
+                      setError(`Erro ao exportar PDF: ${e.message || e}`);
+                    }
+                  }}
                   disabled={delegacoes.length === 0}
                   className="flex items-center justify-between bg-white border border-slate-300 p-3 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-left rounded-none"
                 >
@@ -781,7 +1258,7 @@ export default function App() {
                   <button
                     id="btn-restaurar-exemplos"
                     onClick={restaurarBancoCompleto}
-                    className="text-[10px] font-bold text-blue-950 hover:text-blue-800 uppercase tracking-wider flex items-center gap-1.5 underline cursor-pointer"
+                    className="text-[10px] font-bold text-blue-950 hover:text-blue-800 uppercase tracking-wider flex items-center gap-1.5 underline cursor-pointer bg-transparent border-0"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     Carregar Exemplos
@@ -855,21 +1332,27 @@ export default function App() {
                           <td className="py-4 px-6 text-right space-y-1 sm:space-y-0 sm:space-x-1 whitespace-nowrap">
                             
                             {/* Baixar PDF Individual */}
-                            <button
-                              id={`btn-comprovante-${item.id}`}
-                              onClick={() => exportReciboPDF(item)}
-                              title="Baixar Comprovante Oficial em PDF"
-                              className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-950 transition-colors inline-flex items-center justify-center cursor-pointer border border-transparent hover:border-slate-200 rounded-none"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
+                             <button
+                               id={`btn-comprovante-${item.id}`}
+                               onClick={async () => {
+                                 try {
+                                   await exportReciboPDF(item);
+                                 } catch (e: any) {
+                                   setError(`Erro ao exportar comprovante: ${e.message || e}`);
+                                 }
+                               }}
+                               title="Baixar Comprovante Oficial em PDF"
+                               className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-950 transition-colors inline-flex items-center justify-center cursor-pointer border border-transparent hover:border-slate-200 rounded-none bg-transparent"
+                             >
+                               <Download className="w-4 h-4" />
+                             </button>
 
                             {/* Editar */}
                             <button
                               id={`btn-editar-${item.id}`}
                               onClick={() => handleEdit(item)}
                               title="Editar Inscrição"
-                              className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-yellow-600 transition-colors inline-flex items-center justify-center cursor-pointer border border-transparent hover:border-slate-200 rounded-none"
+                              className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-yellow-600 transition-colors inline-flex items-center justify-center cursor-pointer border border-transparent hover:border-slate-200 rounded-none bg-transparent"
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
@@ -879,7 +1362,7 @@ export default function App() {
                               id={`btn-deletar-${item.id}`}
                               onClick={() => setShowDeleteModal(item.id)}
                               title="Excluir Inscrição"
-                              className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-red-600 transition-colors inline-flex items-center justify-center cursor-pointer border border-transparent hover:border-slate-200 rounded-none"
+                              className="p-1.5 hover:bg-slate-100 text-slate-400 hover:text-red-600 transition-colors inline-flex items-center justify-center cursor-pointer border border-transparent hover:border-slate-200 rounded-none bg-transparent"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -903,7 +1386,7 @@ export default function App() {
                       <button
                         id="btn-recarregar-dados-vazio"
                         onClick={restaurarBancoCompleto}
-                        className="px-4 py-2.5 bg-blue-900 hover:bg-blue-800 text-white text-[10px] uppercase font-bold tracking-widest transition-all rounded-none cursor-pointer inline-flex items-center gap-1.5"
+                        className="px-4 py-2.5 bg-blue-900 hover:bg-blue-800 text-white text-[10px] uppercase font-bold tracking-widest transition-all rounded-none cursor-pointer inline-flex items-center gap-1.5 border-0"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         Restaurar Lista de Exemplo
@@ -953,14 +1436,14 @@ export default function App() {
               <button
                 id="btn-modal-cancelar"
                 onClick={() => setShowDeleteModal(null)}
-                className="flex-1 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider rounded-none cursor-pointer"
+                className="flex-1 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider rounded-none cursor-pointer bg-white"
               >
                 Cancelar
               </button>
               <button
                 id="btn-modal-excluir"
                 onClick={() => handleDelete(showDeleteModal)}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-none cursor-pointer"
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-none cursor-pointer border-0"
               >
                 Sim, Remover
               </button>
