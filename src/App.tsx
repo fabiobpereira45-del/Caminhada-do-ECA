@@ -677,18 +677,6 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Opção Rápida de Mock/Teste */}
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                    <span className="uppercase font-semibold tracking-wider text-[9px] text-slate-400">Ambiente de Testes</span>
-                    <button
-                      id="btn-teste-rapido"
-                      type="button"
-                      onClick={loadExemploValores}
-                      className="text-blue-900 hover:text-blue-800 font-bold uppercase tracking-wide text-[10px] underline cursor-pointer bg-transparent border-0"
-                    >
-                      Gerar dados de teste
-                    </button>
-                  </div>
 
                 </form>
 
@@ -1146,18 +1134,6 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Opção Rápida de Mock/Teste */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                  <span className="uppercase font-semibold tracking-wider text-[9px] text-slate-400">Ambiente de Testes</span>
-                  <button
-                    id="btn-teste-rapido"
-                    type="button"
-                    onClick={loadExemploValores}
-                    className="text-blue-900 hover:text-blue-800 font-bold uppercase tracking-wide text-[10px] underline cursor-pointer bg-transparent border-0"
-                  >
-                    Gerar dados de teste
-                  </button>
-                </div>
 
               </form>
 
