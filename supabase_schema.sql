@@ -41,3 +41,36 @@ VALUES
   ('3', 'Escola Municipal Olga Mettig', 'Rua da Indonésia, s/n - Granjas Rurais, Salvador - BA', 'Ponto de Ônibus em frente à Escola', 'Campo Grande (Concentração da Caminhada)', '06:45', '12:00', 'Diretora Ana Paula Lima', '(71) 98765-4321', 35, '2026-07-07T16:45:00.000Z'),
   ('4', 'Centro Educacional Carneiro Ribeiro (SAPE)', 'Rua Saldanha Marinho, 32 - Caixa d''Água, Salvador - BA', 'Estacionamento interno da Escola', 'Campo Grande (Concentração da Caminhada)', '07:15', '12:45', 'Prof. Roberto Costa Ramos', '(71) 99122-3344', 60, '2026-07-08T08:00:00.000Z')
 ON CONFLICT (id) DO NOTHING;
+
+-- 5. Criação da tabela configs para armazenar o login, senha e detalhes do evento
+CREATE TABLE IF NOT EXISTS public.configs (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+-- Habilitar o RLS para a tabela configs
+ALTER TABLE public.configs ENABLE ROW LEVEL SECURITY;
+
+-- Adicionar políticas de acesso público à tabela configs (Leitura e Escrita completas)
+CREATE POLICY "Permitir leitura pública configs" ON public.configs
+  FOR SELECT USING (true);
+
+CREATE POLICY "Permitir inserção pública configs" ON public.configs
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Permitir atualização pública configs" ON public.configs
+  FOR UPDATE USING (true);
+
+CREATE POLICY "Permitir exclusão pública configs" ON public.configs
+  FOR DELETE USING (true);
+
+-- Dados padrão iniciais para as configurações
+INSERT INTO public.configs (key, value) VALUES
+  ('admin_username', 'admin'),
+  ('admin_password', 'admin'),
+  ('event_title', 'Caminhada do ECA'),
+  ('event_date', '13 de Julho'),
+  ('event_time', '08:00h'),
+  ('event_location', 'Campo Grande')
+ON CONFLICT (key) DO NOTHING;
+

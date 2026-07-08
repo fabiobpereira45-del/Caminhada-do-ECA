@@ -50,12 +50,30 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [publicSuccessData, setPublicSuccessData] = useState<Delegacao | null>(null);
+
+  // --- CONFIG / SETTINGS STATE ---
+  const [adminUsername, setAdminUsername] = useState('admin');
+  const [adminPassword, setAdminPassword] = useState('admin');
+  const [eventTitle, setEventTitle] = useState('Caminhada do ECA');
+  const [eventDate, setEventDate] = useState('13 de Julho');
+  const [eventTime, setEventTime] = useState('08:00h');
+  const [eventLocation, setEventLocation] = useState('Campo Grande');
+
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Settings form states
+  const [newUsername, setNewUsername] = useState('admin');
+  const [newPassword, setNewPassword] = useState('admin');
+  const [newTitle, setNewTitle] = useState('Caminhada do ECA');
+  const [newDate, setNewDate] = useState('13 de Julho');
+  const [newTime, setNewTime] = useState('08:00h');
+  const [newLocation, setNewLocation] = useState('Campo Grande');
   
   // Form State
   const [nomeEscola, setNomeEscola] = useState('');
   const [endereco, setEndereco] = useState('');
   const [embarque, setEmbarque] = useState('');
-  const [destino, setDestino] = useState('Campo Grande (Concentração da Caminhada)');
+  const [destino, setDestino] = useState('Campo Grande');
   const [horarioSaida, setHorarioSaida] = useState('');
   const [horarioRetorno, setHorarioRetorno] = useState('');
   const [responsavel, setResponsavel] = useState('');
@@ -72,8 +90,7 @@ export default function App() {
   const handleLogin = (e: FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    const adminPass = import.meta.env.VITE_ADMIN_PASSWORD || 'admin';
-    if (usernameInput.trim() === 'admin' && passwordInput === adminPass) {
+    if (usernameInput.trim() === adminUsername && passwordInput === adminPassword) {
       sessionStorage.setItem('caminhada_eca_admin_logged', 'true');
       setIsAdminLoggedIn(true);
       triggerSuccess('Login efetuado com sucesso!');
@@ -99,6 +116,120 @@ export default function App() {
     }).catch(() => {
       setError('Não foi possível copiar o link automaticamente.');
     });
+  };
+
+  // Fetch configurations
+  const fetchConfigs = async () => {
+    let initialUsername = 'admin';
+    let initialPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'admin';
+    let initialTitle = 'Caminhada do ECA';
+    let initialDate = '13 de Julho';
+    let initialTime = '08:00h';
+    let initialLocation = 'Campo Grande';
+
+    try {
+      const { data, error } = await supabase.from('configs').select('*');
+      if (!error && data) {
+        data.forEach(item => {
+          if (item.key === 'admin_username') initialUsername = item.value;
+          if (item.key === 'admin_password') initialPassword = item.value;
+          if (item.key === 'event_title') initialTitle = item.value;
+          if (item.key === 'event_date') initialDate = item.value;
+          if (item.key === 'event_time') initialTime = item.value;
+          if (item.key === 'event_location') initialLocation = item.value;
+        });
+      } else {
+        const localUser = localStorage.getItem('caminhada_eca_admin_username');
+        const localPass = localStorage.getItem('caminhada_eca_admin_password');
+        const localTitle = localStorage.getItem('caminhada_eca_event_title');
+        const localDate = localStorage.getItem('caminhada_eca_event_date');
+        const localTime = localStorage.getItem('caminhada_eca_event_time');
+        const localLoc = localStorage.getItem('caminhada_eca_event_location');
+
+        if (localUser) initialUsername = localUser;
+        if (localPass) initialPassword = localPass;
+        if (localTitle) initialTitle = localTitle;
+        if (localDate) initialDate = localDate;
+        if (localTime) initialTime = localTime;
+        if (localLoc) initialLocation = localLoc;
+      }
+    } catch (err) {
+      const localUser = localStorage.getItem('caminhada_eca_admin_username');
+      const localPass = localStorage.getItem('caminhada_eca_admin_password');
+      const localTitle = localStorage.getItem('caminhada_eca_event_title');
+      const localDate = localStorage.getItem('caminhada_eca_event_date');
+      const localTime = localStorage.getItem('caminhada_eca_event_time');
+      const localLoc = localStorage.getItem('caminhada_eca_event_location');
+
+      if (localUser) initialUsername = localUser;
+      if (localPass) initialPassword = localPass;
+      if (localTitle) initialTitle = localTitle;
+      if (localDate) initialDate = localDate;
+      if (localTime) initialTime = localTime;
+      if (localLoc) initialLocation = localLoc;
+    }
+
+    setAdminUsername(initialUsername);
+    setAdminPassword(initialPassword);
+    setEventTitle(initialTitle);
+    setEventDate(initialDate);
+    setEventTime(initialTime);
+    setEventLocation(initialLocation);
+    setDestino(initialLocation);
+
+    // Form inputs state
+    setNewUsername(initialUsername);
+    setNewPassword(initialPassword);
+    setNewTitle(initialTitle);
+    setNewDate(initialDate);
+    setNewTime(initialTime);
+    setNewLocation(initialLocation);
+  };
+
+  // Save settings inside application
+  const handleSaveSettings = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!newUsername.trim()) return setError('O nome de usuário não pode ser vazio.');
+    if (!newPassword.trim()) return setError('A senha não pode ser vazia.');
+    if (!newTitle.trim()) return setError('O título do evento não pode ser vazio.');
+
+    const newConfigs = [
+      { key: 'admin_username', value: newUsername },
+      { key: 'admin_password', value: newPassword },
+      { key: 'event_title', value: newTitle },
+      { key: 'event_date', value: newDate },
+      { key: 'event_time', value: newTime },
+      { key: 'event_location', value: newLocation }
+    ];
+
+    try {
+      const { error: dbErr } = await supabase.from('configs').upsert(newConfigs);
+      if (dbErr) {
+        newConfigs.forEach(item => {
+          localStorage.setItem(`caminhada_eca_${item.key}`, item.value);
+        });
+        triggerSuccess('Configurações salvas localmente.');
+      } else {
+        triggerSuccess('Configurações salvas e sincronizadas com o Supabase!');
+      }
+    } catch (err) {
+      newConfigs.forEach(item => {
+        localStorage.setItem(`caminhada_eca_${item.key}`, item.value);
+      });
+      triggerSuccess('Configurações salvas localmente.');
+    }
+
+    setAdminUsername(newUsername);
+    setAdminPassword(newPassword);
+    setEventTitle(newTitle);
+    setEventDate(newDate);
+    setEventTime(newTime);
+    setEventLocation(newLocation);
+    setDestino(newLocation);
+
+    setShowSettingsModal(false);
   };
 
   // Load from Supabase or fallback to localStorage on initial render
@@ -147,6 +278,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    fetchConfigs();
     fetchDelegacoes();
   }, []);
 
@@ -190,7 +322,7 @@ export default function App() {
     setNomeEscola('');
     setEndereco('');
     setEmbarque('');
-    setDestino('Campo Grande (Concentração da Caminhada)');
+    setDestino(eventLocation);
     setHorarioSaida('');
     setHorarioRetorno('');
     setResponsavel('');
@@ -434,15 +566,15 @@ export default function App() {
             <div className="flex items-center gap-3">
               <img src="/logo.png" alt="Logo Conselho Tutelar" className="w-14 h-14 object-contain bg-white p-1 rounded-full border border-yellow-500" />
               <div>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight uppercase">Caminhada do ECA</h1>
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight uppercase">{eventTitle}</h1>
                 <p className="text-[10px] sm:text-xs font-semibold opacity-80 uppercase tracking-widest">
                   Conselho Tutelar de Salvador • Ficha de Inscrição
                 </p>
               </div>
             </div>
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-yellow-500">13 de Julho • 08:00h</p>
-              <p className="text-[9px] uppercase opacity-70">Concentração no Campo Grande</p>
+              <p className="text-sm font-bold text-yellow-500">{eventDate} • {eventTime}</p>
+              <p className="text-[9px] uppercase opacity-70">Concentração no {eventLocation}</p>
             </div>
           </div>
         </header>
@@ -459,7 +591,7 @@ export default function App() {
               <div className="space-y-2">
                 <h2 className="text-xl font-black text-slate-800 uppercase tracking-wide">Inscrição Homologada!</h2>
                 <p className="text-xs text-slate-500">
-                  A escola <strong>{publicSuccessData.nomeEscola}</strong> foi inscrita com sucesso para a Caminhada do ECA 2026.
+                  A escola <strong>{publicSuccessData.nomeEscola}</strong> foi inscrita com sucesso para o {eventTitle}.
                 </p>
               </div>
 
@@ -573,7 +705,7 @@ export default function App() {
                         type="text"
                         value={destino}
                         onChange={(e) => setDestino(e.target.value)}
-                        placeholder="Campo Grande"
+                        placeholder={eventLocation}
                         className="w-full border border-slate-200 bg-slate-100 text-slate-600 px-3 py-2 text-sm cursor-not-allowed rounded-none placeholder:text-slate-400"
                         readOnly
                       />
@@ -698,7 +830,7 @@ export default function App() {
                   </li>
                   <li className="flex gap-2">
                     <span className="font-bold">•</span>
-                    <span>Ponto de concentração oficial: Campo Grande, às 08:00h pontualmente.</span>
+                    <span>Ponto de concentração oficial: {eventLocation}, às {eventTime} pontualmente.</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="font-bold">•</span>
@@ -713,7 +845,7 @@ export default function App() {
         {/* FOOTER PÚBLICO */}
         <footer className="bg-white border-t border-slate-200 py-6 text-center shrink-0">
           <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-            © 2026 Conselho Tutelar de Salvador - Organização da Caminhada do ECA
+            © 2026 Conselho Tutelar de Salvador - Organização do {eventTitle}
           </p>
         </footer>
 
@@ -732,7 +864,7 @@ export default function App() {
             <img src="/logo.png" alt="Logo Conselho Tutelar" className="w-24 h-24 object-contain mx-auto bg-slate-50 p-2 rounded-full border-2 border-blue-900" />
             <div className="space-y-1">
               <h2 className="text-lg font-black text-blue-900 uppercase tracking-tight">Conselho Tutelar de Salvador</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Painel Administrativo • Caminhada do ECA</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Painel Administrativo • {eventTitle}</p>
             </div>
           </div>
 
@@ -809,7 +941,7 @@ export default function App() {
             <img src="/logo.png" alt="Logo Conselho Tutelar" className="w-16 h-16 object-contain bg-white p-1 rounded-full border-2 border-yellow-500" />
             <div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tighter uppercase flex items-center gap-2">
-                Caminhada do ECA
+                {eventTitle}
               </h1>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1">
                 <p className="text-xs sm:text-sm font-medium opacity-80 uppercase tracking-widest">
@@ -838,12 +970,29 @@ export default function App() {
           
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto shrink-0">
             <div className="text-left sm:text-right hidden md:block">
-              <p className="text-lg sm:text-xl font-bold text-yellow-500">13 de Julho</p>
-              <p className="text-xs uppercase opacity-70">Concentração às 08:00h no Campo Grande</p>
+              <p className="text-lg sm:text-xl font-bold text-yellow-500">{eventDate}</p>
+              <p className="text-xs uppercase opacity-70">Concentração às {eventTime} no {eventLocation}</p>
             </div>
             
             {/* BOTÕES DE CONTROLE ADMIN */}
             <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => {
+                  setNewUsername(adminUsername);
+                  setNewPassword(adminPassword);
+                  setNewTitle(eventTitle);
+                  setNewDate(eventDate);
+                  setNewTime(eventTime);
+                  setNewLocation(eventLocation);
+                  setShowSettingsModal(true);
+                }}
+                title="Configurações Gerais da Plataforma"
+                className="flex-1 sm:flex-initial bg-blue-800 hover:bg-blue-700 text-white font-bold px-3 py-2 text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 rounded-none cursor-pointer border-0"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Configurar</span>
+              </button>
+
               <button
                 onClick={copyPublicLink}
                 title="Copiar Link do Formulário Público para Divulgação"
@@ -1030,7 +1179,7 @@ export default function App() {
                       type="text"
                       value={destino}
                       onChange={(e) => setDestino(e.target.value)}
-                      placeholder="Campo Grande"
+                      placeholder={eventLocation}
                       className="w-full border border-slate-200 bg-slate-100 text-slate-600 px-3 py-2 text-sm cursor-not-allowed rounded-none placeholder:text-slate-400"
                       readOnly
                     />
@@ -1155,7 +1304,7 @@ export default function App() {
                 </li>
                 <li className="flex gap-2">
                   <span className="font-bold">•</span>
-                  <span>Ponto de concentração oficial: Campo Grande, às 08:00h pontualmente.</span>
+                  <span>Ponto de concentração oficial: {eventLocation}, às {eventTime} pontualmente.</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="font-bold">•</span>
@@ -1375,7 +1524,7 @@ export default function App() {
               {/* Informação do Destino Padrão na base */}
               <div className="p-4 bg-slate-50 text-slate-500 text-[9px] uppercase font-bold tracking-wide text-center border-t border-slate-200 flex items-center justify-center gap-1.5">
                 <Info className="w-3.5 h-3.5 text-blue-900 shrink-0" />
-                <span>O destino padrão para todas as delegações é o <strong>Campo Grande</strong>, ponto de início.</span>
+                <span>O destino padrão para todas as delegações é o <strong>{eventLocation}</strong>, ponto de início.</span>
               </div>
 
             </div>
@@ -1389,7 +1538,7 @@ export default function App() {
       <footer className="mt-16 bg-white border-t border-slate-200 py-8 shrink-0" id="footer-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-2">
           <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em]">
-            © 2026 Conselho Tutelar de Salvador - Organização da Caminhada do ECA
+            © 2026 Conselho Tutelar de Salvador - Organização do {eventTitle}
           </p>
           <p className="text-[9px] text-slate-400 max-w-xl mx-auto">
             Estatuto da Criança e do Adolescente (Lei Federal nº 8.069) - Garantindo a prioridade absoluta e a proteção integral a toda criança e adolescente.
@@ -1424,6 +1573,136 @@ export default function App() {
                 Sim, Remover
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIGURAÇÕES (EDITAR LOGIN/SENHA E INFOS DO EVENTO) */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in" id="settings-modal">
+          <div className="bg-white max-w-lg w-full p-6 border border-slate-300 rounded-none space-y-5 overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-blue-900">
+                <Lock className="w-5 h-5" />
+                <h3 className="text-xs font-bold uppercase tracking-wider">Configurações Gerais</h3>
+              </div>
+              <button 
+                onClick={() => setShowSettingsModal(false)}
+                className="text-xs text-slate-400 hover:text-slate-600 font-bold bg-transparent border-0 cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-4">
+              
+              {/* Seção 1: Credenciais de Acesso */}
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">
+                  Credenciais Administrativas
+                </h4>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold text-slate-600 uppercase">Novo Usuário</label>
+                    <input
+                      type="text"
+                      required
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      placeholder="admin"
+                      className="w-full border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold text-slate-600 uppercase">Nova Senha</label>
+                    <input
+                      type="text"
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="admin"
+                      className="w-full border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção 2: Informações do Evento */}
+              <div className="space-y-3 pt-2">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">
+                  Informações da Aplicação & Evento
+                </h4>
+                
+                <div className="space-y-1">
+                  <label className="block text-[9px] font-bold text-slate-600 uppercase">Nome / Título da Aplicação</label>
+                  <input
+                    type="text"
+                    required
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="Caminhada do ECA"
+                    className="w-full border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold text-slate-600 uppercase">Data do Evento</label>
+                    <input
+                      type="text"
+                      required
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      placeholder="13 de Julho"
+                      className="w-full border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[9px] font-bold text-slate-600 uppercase">Horário de Início</label>
+                    <input
+                      type="text"
+                      required
+                      value={newTime}
+                      onChange={(e) => setNewTime(e.target.value)}
+                      placeholder="08:00h"
+                      className="w-full border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[9px] font-bold text-slate-600 uppercase">Local de Concentração (Destino Padrão)</label>
+                  <input
+                    type="text"
+                    required
+                    value={newLocation}
+                    onChange={(e) => setNewLocation(e.target.value)}
+                    placeholder="Campo Grande"
+                    className="w-full border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(false)}
+                  className="flex-1 py-2 border border-slate-300 hover:bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider rounded-none cursor-pointer bg-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-blue-900 hover:bg-blue-800 text-white text-xs font-bold uppercase tracking-wider rounded-none cursor-pointer border-0"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+
+            </form>
           </div>
         </div>
       )}
