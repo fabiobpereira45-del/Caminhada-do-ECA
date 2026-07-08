@@ -10,4 +10,6 @@ export interface Delegacao {
   contato: string;
   quantidade: number;
   dataCadastro: string;
+  documento?: string;      // Base64 string of file
+  documentoNome?: string;  // Name of the uploaded file
 }

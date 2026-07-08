@@ -13,7 +13,9 @@ CREATE TABLE IF NOT EXISTS public.delegacoes (
   responsavel TEXT NOT NULL,
   contato TEXT NOT NULL,
   quantidade INTEGER NOT NULL,
-  "dataCadastro" TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  "dataCadastro" TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  documento TEXT,
+  "documentoNome" TEXT
 );
 
 -- 2. Habilitar o Row Level Security (RLS)

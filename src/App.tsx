@@ -79,6 +79,8 @@ export default function App() {
   const [responsavel, setResponsavel] = useState('');
   const [contato, setContato] = useState('');
   const [quantidade, setQuantidade] = useState<number | ''>('');
+  const [documento, setDocumento] = useState<string>('');
+  const [documentoNome, setDocumentoNome] = useState<string>('');
 
   // Control State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -317,6 +319,28 @@ export default function App() {
     setContato(formatted);
   };
 
+  // Convert uploaded file to base64 data URL
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('O tamanho do arquivo não deve exceder 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDocumento(reader.result as string);
+      setDocumentoNome(file.name);
+      triggerSuccess(`Arquivo "${file.name}" anexado com sucesso!`);
+    };
+    reader.onerror = () => {
+      setError('Erro ao ler o arquivo selecionado.');
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Clear Form Fields
   const resetForm = () => {
     setNomeEscola('');
@@ -328,6 +352,8 @@ export default function App() {
     setResponsavel('');
     setContato('');
     setQuantidade('');
+    setDocumento('');
+    setDocumentoNome('');
     setEditingId(null);
     setError(null);
   };
@@ -411,7 +437,9 @@ export default function App() {
               horarioRetorno,
               responsavel,
               contato,
-              quantidade: Number(quantidade)
+              quantidade: Number(quantidade),
+              documento,
+              documentoNome
             };
           }
           return item;
@@ -431,7 +459,9 @@ export default function App() {
             horarioRetorno,
             responsavel,
             contato,
-            quantidade: Number(quantidade)
+            quantidade: Number(quantidade),
+            documento,
+            documentoNome
           })
           .eq('id', editingId);
 
@@ -456,7 +486,9 @@ export default function App() {
         responsavel,
         contato,
         quantidade: Number(quantidade),
-        dataCadastro: new Date().toISOString()
+        dataCadastro: new Date().toISOString(),
+        documento,
+        documentoNome
       };
       
       if (dbMissing) {
@@ -502,6 +534,8 @@ export default function App() {
     setResponsavel(item.responsavel);
     setContato(item.contato);
     setQuantidade(item.quantidade);
+    setDocumento(item.documento || '');
+    setDocumentoNome(item.documentoNome || '');
     setError(null);
     
     // Scroll smoothly to form on mobile/small screens
@@ -771,8 +805,6 @@ export default function App() {
                       />
                     </div>
                   </div>
-
-                  {/* Quantidade */}
                   <div className="space-y-1">
                     <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
                       Quantidade de Participantes <span className="text-yellow-600">*</span>
@@ -787,6 +819,43 @@ export default function App() {
                       className="w-full sm:w-32 border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all placeholder:text-slate-400"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">Total somado de estudantes, educadores e tutores.</p>
+                  </div>
+
+                  {/* Documento (Lista de Alunos) */}
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                      Lista de Alunos / Documento Anexo <span className="text-slate-400 font-normal">(Opcional)</span>
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <label className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-4 py-2.5 text-xs uppercase tracking-wider cursor-pointer transition-colors select-none">
+                        Anexar Lista
+                        <input
+                          id="input-documento"
+                          type="file"
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                      
+                      {documentoNome ? (
+                        <div className="text-[10px] text-emerald-700 font-bold flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-2">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span className="truncate max-w-[200px]" title={documentoNome}>{documentoNome}</span>
+                          <button
+                            type="button"
+                            onClick={() => { setDocumento(''); setDocumentoNome(''); }}
+                            title="Remover anexo"
+                            className="text-red-605 hover:text-red-800 font-black cursor-pointer bg-transparent border-0 text-[10px] pl-1.5"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">Nenhum arquivo selecionado</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Anexe a listagem oficial dos estudantes da delegação (PDF, Excel, Word ou Imagem).</p>
                   </div>
 
                   {/* Botões de Ação */}
@@ -809,7 +878,6 @@ export default function App() {
                     </button>
                   </div>
 
-
                 </form>
 
               </div>
@@ -831,10 +899,6 @@ export default function App() {
                   <li className="flex gap-2">
                     <span className="font-bold">•</span>
                     <span>Ponto de concentração oficial: {eventLocation}, às {eventTime} pontualmente.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-bold">•</span>
-                    <span>Importante providenciar identificação visual e hidratação para as crianças.</span>
                   </li>
                 </ul>
               </div>
@@ -1245,8 +1309,6 @@ export default function App() {
                     />
                   </div>
                 </div>
-
-                {/* Quantidade */}
                 <div className="space-y-1">
                   <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
                     Quantidade de Participantes <span className="text-yellow-600">*</span>
@@ -1261,6 +1323,43 @@ export default function App() {
                     className="w-full sm:w-32 border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-none transition-all placeholder:text-slate-400"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">Total somado de estudantes, educadores e tutores.</p>
+                </div>
+
+                {/* Documento (Lista de Alunos) */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">
+                    Lista de Alunos / Documento Anexo <span className="text-slate-400 font-normal">(Opcional)</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <label className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-4 py-2.5 text-xs uppercase tracking-wider cursor-pointer transition-colors select-none">
+                      Anexar Lista
+                      <input
+                        id="input-documento-admin"
+                        type="file"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    
+                    {documentoNome ? (
+                      <div className="text-[10px] text-emerald-700 font-bold flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-2">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-[200px]" title={documentoNome}>{documentoNome}</span>
+                        <button
+                          type="button"
+                          onClick={() => { setDocumento(''); setDocumentoNome(''); }}
+                          title="Remover anexo"
+                          className="text-red-605 hover:text-red-800 font-black cursor-pointer bg-transparent border-0 text-[10px] pl-1.5"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">Nenhum arquivo selecionado</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">Anexe a listagem oficial dos estudantes da delegação (PDF, Excel, Word ou Imagem).</p>
                 </div>
 
                 {/* Botões de Ação */}
@@ -1283,7 +1382,6 @@ export default function App() {
                   </button>
                 </div>
 
-
               </form>
 
             </div>
@@ -1305,10 +1403,6 @@ export default function App() {
                 <li className="flex gap-2">
                   <span className="font-bold">•</span>
                   <span>Ponto de concentração oficial: {eventLocation}, às {eventTime} pontualmente.</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="font-bold">•</span>
-                  <span>Importante providenciar identificação visual e hidratação para as crianças.</span>
                 </li>
               </ul>
             </div>
@@ -1471,6 +1565,18 @@ export default function App() {
                              >
                                <Download className="w-4 h-4" />
                              </button>
+
+                            {/* Baixar Lista de Alunos Anexa */}
+                            {item.documento && (
+                              <a
+                                href={item.documento}
+                                download={item.documentoNome || 'lista_alunos'}
+                                title={`Baixar Lista de Alunos: ${item.documentoNome}`}
+                                className="p-1.5 hover:bg-slate-100 text-emerald-600 hover:text-emerald-800 transition-colors inline-flex items-center justify-center cursor-pointer border border-transparent hover:border-slate-200 rounded-none bg-transparent"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </a>
+                            )}
 
                             {/* Editar */}
                             <button
